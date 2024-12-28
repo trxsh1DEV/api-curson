@@ -9,28 +9,54 @@ import {
 import { fastifySwagger } from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import { Users } from "./routes/users";
+import { Courses } from "./routes/courses";
+import path from "path";
+import fastifyEnv from "@fastify/env";
+import { options } from "./config/env";
 
-const app = fastify().withTypeProvider<ZodTypeProvider>();
-app.setValidatorCompiler(validatorCompiler);
-app.setSerializerCompiler(serializerCompiler);
+async function bootstrap() {
+  const app = fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
 
-app.register(fastifyCors, { origin: "*" });
+  // Register env plugin first
+  await app.register(fastifyEnv, options);
 
-app.register(fastifySwagger, {
-  openapi: {
-    info: {
-      title: "Typed API",
-      version: "1.0.0",
+  // Register plugins
+  await app.register(fastifyCors, { origin: "*" });
+  await app.register(require("@fastify/multipart"));
+  await app.register(require("@fastify/static"), {
+    root: path.join(__dirname, "..", "uploads"),
+    prefix: "/static/",
+  });
+
+  // Register Swagger
+  await app.register(fastifySwagger, {
+    openapi: {
+      info: {
+        title: "Typed API",
+        version: "1.0.0",
+      },
     },
-  },
-  transform: jsonSchemaTransform,
-});
-app.register(fastifySwaggerUi, {
-  routePrefix: "/docs",
-});
+    transform: jsonSchemaTransform,
+  });
+  await app.register(fastifySwaggerUi, {
+    routePrefix: "/docs",
+  });
 
-app.register(Users);
+  // Register routes
+  await app.register(Users);
+  await app.register(Courses);
 
-app.listen({ port: 3333 }).then(() => {
-  console.log(`Server is running on port 3333`);
-});
+  try {
+    await app.listen({ port: Number(app.config.SERVER_PORT) });
+    console.log(
+      `Server is running on ${app.config.SERVER_URL}:${app.config.SERVER_PORT}`
+    );
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
+}
+
+bootstrap();
