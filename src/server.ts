@@ -22,6 +22,8 @@ async function bootstrap() {
   // Register env plugin first
   await app.register(fastifyEnv, options);
 
+  // Register db plugin
+
   // Register plugins
   await app.register(fastifyCors, { origin: "*" });
   await app.register(require("@fastify/multipart"));
